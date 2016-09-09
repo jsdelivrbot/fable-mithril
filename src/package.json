@@ -1,0 +1,23 @@
+{
+  "name": "fable-mithril",
+  "version": "0.0.3",
+  "description": "Mithril bindings and VDOM dsl",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/fable-compiler/fable-mithril.git"
+  },
+  "scripts": {
+  },
+  "dependencies": {
+    "fable-core": "^0.5.5"
+  },
+  "keywords": [
+    "Elm",
+    "F#",
+    "Fable",
+    "Mithril",
+    "VDOM"
+  ],
+  "author": "musheddev",
+  "license": "MIT"
+}
