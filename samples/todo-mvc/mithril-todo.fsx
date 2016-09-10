@@ -1,29 +1,28 @@
 
 // Load Fable.Core and bindings to JS global objects
 #r "node_modules/fable-core/Fable.Core.dll"
-#load "Mithril.fs"
+#load "../../src/fable-mithril.fs"
 
 open System.Text.RegularExpressions
 open System
 open Fable.Core
 open Fable.Import.Browser
 open Fable.Import
-open MithrilBase
-open Mithril
-
-//ridiculus crazy hack
-let m = Fable.Import.Node.require.Invoke("mithril")
-
+open Fable.Core.JsInterop
+open Fable.Import.MithrilBase
+open Fable.Import.Mithril
 
 //mithril demo
 type LocalStorage<'t>(id :string) =
     let store_id = id
 
-    member x.get() :'t =
-        JS.JSON.parse(Browser.localStorage.getItem(store_id) :?> string) :?> 't
+    member x.get() :'t option =
+            Browser.localStorage.getItem(store_id) 
+            |> function null -> None | x -> Some (unbox x)
+            |> Core.Option.map ofJson<'t>
 
     member x.set (ls :'t) = 
-        Browser.localStorage.setItem(store_id, JS.JSON.stringify(ls))
+        Browser.localStorage.setItem(store_id, toJson(ls))
 
 type Reminder = { description: MithrilBase.Property<string>; 
                   date: MithrilBase.Property<DateTime>;
@@ -40,32 +39,27 @@ type Reminder = { description: MithrilBase.Property<string>;
 
 type Cont() =
     
-    let local = LocalStorage<seq<Reminder>>("reminder_list")
+    let local = LocalStorage<array<Reminder>>("reminder_list")
     member this.MaxString = 100
 
-    member this.List with get () = local.get()
+    member this.List with get () = 
+                        match local.get() with
+                        | Some(ary) -> ary
+                        | None -> Array.empty<Reminder>
                       and set (x) = local.set(x)
 
     member this.Discription = property ""
 
     member this.Add() =
         if not (this.Discription.get = "") && (Regex.Replace(this.Discription.get,"/\s/g","").Length <= this.MaxString) then 
-            this.List <- Seq.append (Seq.singleton (Reminder.New (this.Discription.get.Trim()) DateTime.UtcNow )) this.List
+            this.List <- Array.append [| (Reminder.New (this.Discription.get.Trim()) DateTime.UtcNow )|] this.List
             this.Discription.set ""
 
     interface Controller with
         member x.onunload evt = () :> obj
 
-        
 
-
-
-let vm = Cont()
-
-let vm_init x = vm        
-
-
-let item_view (index :int) (r :Reminder) =
+let item_view (vm :Cont) (index :int) (r :Reminder) =
     let charlim = vm.MaxString - r.description.get.Length
     let charlimit = span (attr [css "inner-status"]) [charlim.ToString()]
     let description = div (attr [
@@ -86,9 +80,10 @@ let item_view (index :int) (r :Reminder) =
                             prop "rows" 1;
                             onInput (bindattr "value" r.description.set) ;
                             onKeyup (fun e -> 
-                                        if e?keyCode :?> int = 13 then 
+                                        let e2 = e :?> KeyboardEvent
+                                        if e2.keyCode  = 13. then 
                                             r.editing.set false
-                                        else if e?keyCode :?> int = 27 then 
+                                        else if e2.keyCode  = 27. then 
                                             r.description.set r.prev.get
                                             r.editing.set false
                                         else 
@@ -117,9 +112,10 @@ let main_view (vm1 :Cont) =
                     prop "placeholder" "Notification test" ;
                     prop "autofocus" true ;
                     prop "value" vm1.Discription.get ;
-                    onKeyup (fun e -> if e?keyCode :?> int = 13 then 
+                    onKeyup (fun e -> let e2 = e :?> KeyboardEvent
+                                      if e2.keyCode = 13. then 
                                         vm1.Add()
-                                      else if e?keyCode :?> int = 27 then 
+                                      else if e2.keyCode = 27. then 
                                         vm1.Discription.set ""
                                       else 
                                         Mithril.redrawStrategy "none") ;
@@ -134,18 +130,15 @@ let main_view (vm1 :Cont) =
             then [(vm1.MaxString - Regex.Replace(vm1.Discription.get,"/\s/g","").Length).ToString()  + " character left"] 
             else [ span (attr [css "danger"]) ["limit of " + vm1.MaxString.ToString()]]) ;
         ul (attr [name "todo-list"])
-            (vm1.List |> Seq.mapi item_view |> Seq.toList)
+            (if vm1.List.Length = 0 then [] else (vm1.List |> Array.mapi (item_view vm1) |> Array.toList))
     ]
 
         
-
+let vm = Cont()
+let vm_init x = vm  
 let com = newComponent vm_init main_view
 
 
         
 mount(document.body, com )        
         
-        
-(*  "devDependencies": {
-    "fable-import-mithril": "^0.0.19"
-  },*)
