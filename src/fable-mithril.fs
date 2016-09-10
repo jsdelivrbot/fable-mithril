@@ -2,6 +2,7 @@ namespace Fable.Import
 
 open System
 open Fable.Core
+open Fable.Core.JsInterop
 open Fable.Import.JS
 open Fable.Import.Browser
 
@@ -19,7 +20,7 @@ module MithrilBase =
     | Component of Component<Controller>
 
     and Static =
-        abstract redraw: Redraw with get, set
+        abstract redraw: Redraw with get
         abstract route: obj with get, set
         abstract deferred: obj with get, set
         [<Emit("$0($1...)")>] abstract Invoke: selector: string * [<ParamArray>] children: Children[] -> VirtualElement
@@ -133,8 +134,9 @@ module MithrilBase =
         abstract config: xhr: XMLHttpRequest * options: obj -> obj
 
     and Redraw =
-        [<Emit("$0()")>] abstract redraw: unit -> unit
-        abstract strategy: string with get, set
+        [<Emit("$0(true)")>] abstract redraw: unit -> unit
+        [<Emit("$0.strategy($1)")>] abstract set_strategy: string -> unit
+        [<Emit("$0.strategy()")>] abstract get_strategy: unit -> string
 
 type Globals =
     [<Global>] static member m with get(): MithrilBase.Static = failwith "JS only" and set(v: MithrilBase.Static): unit = failwith "JS only"
@@ -142,7 +144,7 @@ type Globals =
 module Mithril =
     open MithrilBase
 
-    let m = Fable.Import.Node.require.Invoke("mithril")
+    let get_m = Fable.Import.Node.require.Invoke("mithril") //dirty hack
 
     let (|VirtualElement|_|) (o: obj) =
         if (box o?tag) <> null
@@ -408,7 +410,7 @@ module Mithril =
 
 
 
-    let inline attr (ls :(string *obj) list) =
+    let attr (ls :(string *obj) list) =
         let a = createEmpty<Attributes>
         for (s,o) in ls do
             match o with
@@ -472,7 +474,7 @@ module Mithril =
         Globals.m.trust html
 
     let redrawStrategy(rdw:string) =
-        Globals.m.redraw.strategy <- rdw
+        Globals.m.redraw.set_strategy(rdw)
 
     let render (elm,children) =
         Globals.m.render (elm,children)
